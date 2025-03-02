@@ -1,0 +1,18 @@
+.audio-visualizer {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0 auto;
+}
+
+/* Smooth transitions */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure canvas is responsive */
+canvas {
+  max-width: 100%;
+  height: auto;
+}
