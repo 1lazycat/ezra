@@ -7,8 +7,8 @@ const routerPromptPath = promptPath("router.prompt.md");
 
 export const detectRoute = async (userQuery: string) => {
   try {
-    const prompt = fs.readFileSync(routerPromptPath, "utf-8");
-    prompt.replace("{{user_query}}", userQuery);
+    let prompt = fs.readFileSync(routerPromptPath, "utf-8");
+    prompt = prompt.replace("{{user_query}}", userQuery);
     const data = {
       contents: [
         {
@@ -28,7 +28,7 @@ export const detectRoute = async (userQuery: string) => {
       }
     );
 
-    return response.data;
+    return response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   } catch (error) {
     console.error("Error calling Google Gen AI:", error);
     throw error;

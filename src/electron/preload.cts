@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from "electron";
+const electron = require("electron");
 
-contextBridge.exposeInMainWorld("electron", {
-  orchestrate: (request: any) => ipcRenderer.invoke("orchestrate", request),
+electron.contextBridge.exposeInMainWorld("electron", {
+  orchestrate: (request: any) => electron.ipcRenderer.invoke("orchestrate", request),
 });

@@ -9,12 +9,15 @@ const VoiceAssistant: React.FC = () => {
   );
   const [message, setMessage] = useState<string>("How can I help you today?");
   const [audioData, setAudioData] = useState<Uint8Array | undefined>(undefined);
+  const [userSpeech, setUserSpeech] = useState<string>("");
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number>(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Initialize audio context
   useEffect(() => {
@@ -60,6 +63,13 @@ const VoiceAssistant: React.FC = () => {
       );
       sourceNodeRef.current.connect(analyserRef.current);
 
+      // Initialize MediaRecorder
+      mediaRecorderRef.current = new MediaRecorder(micStreamRef.current);
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+      mediaRecorderRef.current.start();
+
       setStatus("listening");
       setMessage("Listening...");
 
@@ -79,7 +89,7 @@ const VoiceAssistant: React.FC = () => {
       // Simulate AI response after 5 seconds
       setTimeout(() => {
         stopListening();
-        simulateResponse();
+        sendOrchestrateEvent();
       }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
@@ -106,56 +116,39 @@ const VoiceAssistant: React.FC = () => {
       cancelAnimationFrame(animationFrameRef.current);
     }
 
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+
     setAudioData(undefined);
     setStatus("idle");
   };
 
-  // Simulate AI response
-  const simulateResponse = () => {
+  // Send orchestrate event
+  const sendOrchestrateEvent = async () => {
     setStatus("speaking");
-    setMessage("I understand your request. How else can I assist you?");
+    setMessage("Processing your request...");
 
-    // Simulate speaking animation
-    if (analyserRef.current) {
-      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-
-      let time = 0;
-      const updateSpeakingAnimation = () => {
-        if (status === "speaking") {
-          time += 0.1;
-
-          // Generate synthetic audio data for visualization
-          for (let i = 0; i < dataArray.length; i++) {
-            const frequency = (i / dataArray.length) * 10;
-            dataArray[i] =
-              128 + Math.sin(time * 5 + frequency) * 64 * Math.sin(time);
-          }
-
-          setAudioData(new Uint8Array(dataArray));
-          animationFrameRef.current = requestAnimationFrame(
-            updateSpeakingAnimation
-          );
-        }
-      };
-
-      updateSpeakingAnimation();
-
-      // End speaking after 4 seconds
-      setTimeout(() => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-        setAudioData(undefined);
-        setStatus("idle");
-        setMessage("How can I help you today?");
-      }, 4000);
+    try {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+      const audioStream = audioBlob.stream();
+      const response = await window.electron.orchestrate({ query: "User voice input", audioStream });
+      setMessage(response);
+      setUserSpeech("User voice input"); // Display user speech
+    } catch (error) {
+      console.error("Error sending orchestrate event:", error);
+      setMessage("Failed to process your request. Please try again.");
     }
+
+    setStatus("idle");
   };
 
   return (
     <div className="flex flex-col items-center justify-center h-full">
       <div className="text-center mb-8">
         <p className="text-xl">{message}</p>
+        <p className="text-lg text-gray-500">{userSpeech}</p> {/* Display user speech */}
       </div>
 
       <div className="relative mb-8">

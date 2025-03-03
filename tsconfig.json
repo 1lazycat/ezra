@@ -4,7 +4,7 @@
     "composite": true,
     "noEmit": false
   },
-  "include": ["src"],
+  "include": ["src", "types.d.ts"],
   "exclude": ["src/electron"],
   "references": [
     { "path": "./tsconfig.app.json" },

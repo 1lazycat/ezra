@@ -31,9 +31,9 @@ export const configPath = () =>
 
 export const secretsPath = () =>
   isDev()
-    ? path.join(devRoot(), "secrets.json")
+    ? path.join(devRoot(), "electron", "secrets.json")
     : path.join(app.getAppPath(), "..", "secrets.json");
 
 export const promptPath = (fileName: string) => {
-  return path.join(devRoot(), "data", "prompts", fileName);
+  return path.join(devRoot(), "electron", "data", "prompts", fileName);
 };
