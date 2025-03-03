@@ -44,6 +44,10 @@ const VoiceAssistant: React.FC = () => {
 
   // Initialize audio context
   useEffect(() => {
+    setTimeout(() => {
+      speakMessage(message);
+    }, 1000);
+
     audioContextRef.current = new (window.AudioContext ||
       (window as any).webkitAudioContext)();
     analyserRef.current = audioContextRef.current.createAnalyser();
@@ -104,16 +108,21 @@ const VoiceAssistant: React.FC = () => {
 
       const toolName = Object.keys(step.tool)[0];
       const toolArgs = step.tool[toolName].args;
+      speak(step.description);
 
       try {
         const result = JSON.parse(
           await window.electron.execute(toolName, toolArgs)
         );
-        if (result?.data !== undefined) {
-          speak(`The result is ${result.data}`);
-          llmResponse.plan.steps[i].tool[toolName].result = result.data;
+        if (result?.data !== undefined && llmResponse?.plan?.steps?.[i]) {
+          // speak(`The result is ${result.data}`);
+          if (llmResponse.plan.steps[i].tool[toolName]) {
+            llmResponse.plan.steps[i].tool[toolName].result = result.data;
+          }
         }
-        response.plan.steps[i].completed = true;
+        if (response.plan.steps?.[i]) {
+          response.plan.steps[i].completed = true;
+        }
 
         if (i === response.plan.steps.length - 1) {
           const answer = await window.electron.answer({
@@ -127,9 +136,11 @@ const VoiceAssistant: React.FC = () => {
           setIsExecutingPlan(false);
           setStatus("idle");
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(`Error executing tool ${toolName}:`, error);
-        speak(`Failed to execute step: ${error.message}`);
+        const errorMessage =
+          error instanceof Error ? error.message : "An unknown error occurred";
+        speak(`Failed to execute step: ${errorMessage}`);
         setMessage(`Failed to execute step: ${step.description}`);
         setIsExecutingPlan(false);
         setStatus("idle");
@@ -221,6 +232,7 @@ const VoiceAssistant: React.FC = () => {
       setStatus("listening");
       setMessage("Listening...");
       setLlmResponse(undefined);
+      setDisplayedMessage("");
 
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
 
@@ -348,9 +360,9 @@ const VoiceAssistant: React.FC = () => {
     <div className="flex h-full bg-gradient-to-br">
       <div className="flex-[2] flex flex-col items-center justify-center">
         <div className="w-full max-w-2xl px-8 py-6 mb-12 ">
-          <p className="text-lg font-medium text-white/90 text-center leading-relaxed">
+          <p className="text-lg font-medium text-teal-600 animated-message text-center leading-relaxed">
             {displayedMessage}
-            {isAnimating && <span className="animate-pulse">▋</span>}
+            {isAnimating && <span className="cursor animate-pulse" />}
           </p>
         </div>
 

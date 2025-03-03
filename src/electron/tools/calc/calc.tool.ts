@@ -1,10 +1,10 @@
-import { ToolMetadata, ToolResponse, ToolArgs } from "../@types/tool.js";
+import { ToolMetadata, ToolResponse } from "../@types/tool.js";
 
 export const calcualtor = async (args: {
   a: number;
   b: number;
   operation: string;
-} satisfies ToolArgs ): Promise<ToolResponse<number>> => {
+}): Promise<ToolResponse<number>> => {
   const { a, b, operation } = args;
   const result = await new Promise<number>((resolve, reject) => {
     try {

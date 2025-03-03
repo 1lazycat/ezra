@@ -98,3 +98,17 @@ canvas {
 .status-icon-completed {
   color: #22c55e;
 }
+
+/* Animated message text */
+.animated-message {
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.animated-message .cursor {
+  display: inline-block;
+  background: #fff;
+  margin-left: 2px;
+  width: 3px;
+  height: 1em;
+  vertical-align: middle;
+}
