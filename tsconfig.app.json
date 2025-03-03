@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "composite": true,
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": false,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@@ui/libs/*": ["./src/ui/libs/*"],
+      "@@ui/elements/*": ["./src/ui/elements/*"],
+      "@@ui/components/*": ["./src/ui/components/*"],
+      "@@ui/hooks/*": ["./src/ui/hooks/*"],
+      "@@ui/types": ["./src/ui/@types"],
+      "@@electron/services/*": ["./src/electron/services/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "build"]
+}
