@@ -15,11 +15,15 @@ const prompt = fs.readFileSync(promptFilePath, "utf-8");
 export const orchestrate = async (request: OrchestratorRequest) => {
   const tools = getToolsMarkdown();
   let formattedPrompt = prompt.replace("{{tools}}", tools);
-  formattedPrompt = formattedPrompt.replace(
-    "{{userInput}}",
-    "Refer attached audio file for user input."
-  );
-
+  if (request.query) {
+    formattedPrompt = formattedPrompt.replace("{{userInput}}", request.query);
+  } else {
+    formattedPrompt = formattedPrompt.replace(
+      "{{userInput}}",
+      "Refer attached audio file for user input."
+    );
+  }
+  
   if (request.audioData) {
     try {
       // Initialize Gemini
