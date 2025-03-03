@@ -5,7 +5,7 @@ interface AudioVisualizerProps {
   audioData?: Uint8Array;
 }
 
-const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
+const   AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   status,
   audioData,
 }) => {

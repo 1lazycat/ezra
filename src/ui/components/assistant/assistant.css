@@ -5,6 +5,35 @@
   margin: 0 auto;
 }
 
+/* Glass morphism */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+}
+
+.glass-panel-hover {
+  transition: all 0.3s ease;
+}
+
+.glass-panel-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Floating animation */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.floating {
+  animation: float 6s ease-in-out infinite;
+}
+
 /* Smooth transitions */
 .transition-all {
   transition-property: all;
@@ -15,4 +44,57 @@
 canvas {
   max-width: 100%;
   height: auto;
+}
+
+/* Execution plan panel styles */
+.execution-plan {
+  background: rgba(17, 25, 40, 0.75);
+  backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: -4px 0 25px rgba(0, 0, 0, 0.2);
+}
+
+.execution-step {
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.execution-step:hover {
+  transform: translateX(-4px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Add subtle animations for step transitions */
+@keyframes stepComplete {
+  from { 
+    opacity: 0.7;
+    transform: scale(0.98) translateX(0);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1) translateX(-4px);
+  }
+}
+
+.step-complete {
+  animation: stepComplete 0.3s ease forwards;
+}
+
+/* Status icons */
+.status-icon {
+  transition: all 0.3s ease;
+}
+
+.status-icon-pending {
+  color: #94a3b8;
+}
+
+.status-icon-active {
+  color: #3b82f6;
+}
+
+.status-icon-completed {
+  color: #22c55e;
 }

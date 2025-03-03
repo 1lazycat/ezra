@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, Volume2 } from "lucide-react";
+import {
+  Mic,
+  Volume2,
+  CircleDot,
+  Circle,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import AudioVisualizer from "./audio-visualizer";
 import "./assistant.css";
 import { LLMResponse } from "../../../types/llm";
+import { useSpeechSynthesis } from "../../hooks/speech.hook";
 
 const VoiceAssistant: React.FC = () => {
   const [status, setStatus] = useState<"idle" | "listening" | "speaking">(
@@ -15,7 +23,8 @@ const VoiceAssistant: React.FC = () => {
   );
   const [displayedMessage, setDisplayedMessage] = useState<string>("");
   const [isAnimating, setIsAnimating] = useState(false);
-  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [currentStep, setCurrentStep] = useState<number>(-1);
+  const { speak } = useSpeechSynthesis();
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -25,6 +34,13 @@ const VoiceAssistant: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add new state for tracking execution
+  const [stepStates, setStepStates] = useState<
+    ("pending" | "active" | "completed")[]
+  >([]);
+  const [isExecutingPlan, setIsExecutingPlan] = useState(false);
 
   // Initialize audio context
   useEffect(() => {
@@ -74,11 +90,119 @@ const VoiceAssistant: React.FC = () => {
 
   // Remove the separate animation effect from message changes
   useEffect(() => {
-    if (message === "Listening..." || message === "Processing your request...") {
+    if (
+      message === "Listening..." ||
+      message === "Processing your request..."
+    ) {
       setDisplayedMessage(message);
       return;
     }
   }, [message]);
+
+  // Execute plan steps
+  useEffect(() => {
+    if (
+      llmResponse?.plan?.steps &&
+      currentStep >= 0 &&
+      currentStep < llmResponse.plan.steps.length
+    ) {
+      const step = llmResponse.plan.steps[currentStep];
+      speak(step.description);
+
+      // Execute tool if present
+      if (step.tool) {
+        const toolName = Object.keys(step.tool)[0];
+        const toolArgs = step.tool[toolName].args;
+        // Call the tool through electron
+        window.electron.orchestrate({
+          query: `execute_tool:${toolName}`,
+          args: toolArgs,
+        });
+      }
+    }
+  }, [currentStep, llmResponse]);
+
+  // Update step states when LLM response changes
+  useEffect(() => {
+    if (llmResponse?.plan?.steps) {
+      setStepStates(new Array(llmResponse.plan.steps.length).fill("pending"));
+      // Start execution if there are steps
+      if (llmResponse.plan.steps.length > 0) {
+        setCurrentStep(0);
+        setIsExecutingPlan(true);
+      }
+    }
+  }, [llmResponse]);
+
+  // Handle step execution
+  useEffect(() => {
+    if (isExecutingPlan && llmResponse?.plan?.steps && currentStep >= 0) {
+      const step = llmResponse.plan.steps[currentStep];
+
+      // Update current step state to active
+      setStepStates((prev) => {
+        const newStates = [...prev];
+        newStates[currentStep] = "active";
+        return newStates;
+      });
+
+      // Read out step description
+      speak(step.description);
+
+      // Execute tool if present
+      if (step.tool) {
+        const toolName = Object.keys(step.tool)[0];
+        const toolArgs = step.tool[toolName].args;
+
+        // Execute tool and handle response
+        window.electron
+          .orchestrate({
+            query: `execute_tool:${toolName}`,
+            args: toolArgs,
+          })
+          .then(() => {
+            // Mark step as completed
+            setStepStates((prev) => {
+              const newStates = [...prev];
+              newStates[currentStep] = "completed";
+              return newStates;
+            });
+
+            // Move to next step after a short delay
+            setTimeout(() => {
+              if (currentStep < llmResponse.plan.steps.length - 1) {
+                setCurrentStep((prev) => prev + 1);
+              } else {
+                setIsExecutingPlan(false);
+                setStatus("idle");
+              }
+            }, 1000);
+          })
+          .catch((error: Error) => {
+            console.error(`Error executing tool ${toolName}:`, error);
+            setMessage(`Failed to execute step: ${step.description}`);
+            setIsExecutingPlan(false);
+            setStatus("idle");
+          });
+      } else {
+        // If no tool, just mark as completed and move to next step
+        setStepStates((prev) => {
+          const newStates = [...prev];
+          newStates[currentStep] = "completed";
+          return newStates;
+        });
+
+        setTimeout(() => {
+          if (currentStep < llmResponse.plan.steps.length - 1) {
+            setCurrentStep((prev) => prev + 1);
+          } else {
+            setIsExecutingPlan(false);
+            setStatus("idle");
+          }
+        }, 2000); // Give more time to read steps without tools
+      }
+    }
+  }, [currentStep, isExecutingPlan, llmResponse]);
 
   // Speech synthesis function
   const speakMessage = (text: string) => {
@@ -161,6 +285,7 @@ const VoiceAssistant: React.FC = () => {
 
       setStatus("listening");
       setMessage("Listening...");
+      setLlmResponse(undefined);
 
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
 
@@ -233,45 +358,109 @@ const VoiceAssistant: React.FC = () => {
     }
   };
 
+  const renderExecutionPlan = () => {
+    if (!llmResponse?.plan?.steps || llmResponse.plan.steps.length === 0)
+      return null;
+
+    return (
+      <div className="fixed right-8 top-8 h-[calc(100vh-4rem)] w-1/3 execution-plan glass-panel p-6 overflow-y-auto">
+        <h3 className="text-xl font-semibold text-white/90 mb-4 flex items-center">
+          <CircleDot className="w-5 h-5 mr-2 text-blue-400" />
+          Execution Plan
+        </h3>
+        <div className="space-y-4">
+          {llmResponse.plan.steps.map((step, index) => (
+            <div
+              key={step.id}
+              className={`p-4 rounded-lg execution-step glass-panel-hover
+                ${stepStates[index] === "completed" ? "step-complete" : ""}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-1">
+                  {stepStates[index] === "active" ? (
+                    <CircleDot className="w-5 h-5 status-icon status-icon-active" />
+                  ) : stepStates[index] === "completed" ? (
+                    <CheckCircle2 className="w-5 h-5 status-icon status-icon-completed" />
+                  ) : (
+                    <Circle className="w-5 h-5 status-icon status-icon-pending" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-white/80">{step.description}</p>
+                  {step.tool && (
+                    <div className="mt-2 text-xs text-white/60 flex items-center">
+                      <span className="mr-1">Tool:</span>
+                      {Object.keys(step.tool)[0]}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center h-full">
-      <div className="w-full max-w-2xl px-6 py-4 mb-12 rounded-lg mt-10">
-        <p className="text-md font-medium text-teal-600 text-center leading-relaxed">
-          {displayedMessage}
-          {isAnimating && <span className="animate-pulse">▋</span>}
-        </p>
-      </div>
+    <div className="flex h-full bg-gradient-to-br">
+      <div className="flex-[2] flex flex-col items-center justify-center">
+        <div className="w-full max-w-2xl px-8 py-6 mb-12 ">
+          <p className="text-lg font-medium text-white/90 text-center leading-relaxed">
+            {displayedMessage}
+            {isAnimating && <span className="animate-pulse">▋</span>}
+          </p>
+        </div>
 
-      <div className="relative mb-8">
-        <AudioVisualizer status={status} audioData={audioData} />
-        <button
-          className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-12
-                     rounded-full p-4 transition-all duration-300
-                     ${
-                       status === "idle"
-                         ? "bg-blue-500 hover:bg-blue-600"
-                         : status === "listening"
-                         ? "bg-red-500 hover:bg-red-600"
-                         : "bg-purple-500 hover:bg-purple-600"
-                     }`}
-          onClick={status === "idle" ? startListening : stopListening}
-          disabled={status === "speaking"}
-        >
-          {status === "idle" || status === "listening" ? (
-            <Mic className="w-8 h-8 text-white" />
+        <div className="relative mb-12">
+          <div className="p-8">
+            <AudioVisualizer status={status} audioData={audioData} />
+          </div>
+          <button
+            className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-12
+                       rounded-full p-4 glass-panel transition-all duration-300
+                       hover:scale-105 hover:shadow-lg
+                       ${
+                         status === "idle"
+                           ? "hover:shadow-blue-500/20"
+                           : status === "listening"
+                           ? "hover:shadow-red-500/20"
+                           : "hover:shadow-purple-500/20"
+                       }`}
+            onClick={status === "idle" ? startListening : stopListening}
+            disabled={status === "speaking"}
+          >
+            {status === "idle" || status === "listening" ? (
+              <Mic
+                className={`w-8 h-8 ${
+                  status === "idle" ? "text-blue-400" : "text-red-400"
+                }`}
+              />
+            ) : (
+              <Volume2 className="w-8 h-8 text-purple-400" />
+            )}
+          </button>
+        </div>
+
+        <div className="text-center text-gray-400 mt-20">
+          {status === "idle" ? (
+            <div className="flex items-center justify-center">
+              Click the microphone to start speaking
+            </div>
+          ) : status === "listening" ? (
+            <div className="flex items-center justify-center">
+              Listening to your voice...
+            </div>
           ) : (
-            <Volume2 className="w-8 h-8 text-white" />
+            <div className="flex items-center justify-center">
+              AI is responding...
+            </div>
           )}
-        </button>
+        </div>
       </div>
-
-      <div className="text-center text-gray-300 mt-16">
-        {status === "idle"
-          ? "Click the microphone to start speaking"
-          : status === "listening"
-          ? "Listening to your voice..."
-          : "AI is responding..."}
-      </div>
+      {llmResponse?.plan?.steps && llmResponse.plan.steps.length > 0 && (
+        <div className="flex-1">{renderExecutionPlan()}</div>
+      )}
     </div>
   );
 };
