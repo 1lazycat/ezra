@@ -12,8 +12,8 @@ app.whenReady().then(() => {
     },
     frame: true,
     darkTheme: true,
-    title: "S3 Manager",
-    icon: asset("icon.png"),
+    title: "Ezra",
+    // icon: asset("icon.png"),
   });
   if (isDev()) {
     mainWindow.loadURL("http://localhost:5123");

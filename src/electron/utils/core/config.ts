@@ -1,7 +1,8 @@
 import { binary } from "../path/resolver.js";
 import { readFileSync } from "fs";
-import { configPath as configFilePath } from "../path/resolver.js";
+import { configPath as configFilePath, secretsPath } from "../path/resolver.js";
 import { getLogger } from "./logger.js";
+import { AppConfig } from "../../@types/config.js";
 
 const logger = getLogger();
 
@@ -26,12 +27,31 @@ export const appConfig = (): AppConfig => {
     config = readConfig();
     config = {
       ...config,
-      tools: {
-        sevenZip: {
-          path: config.tools?.sevenZip?.path || binary("7zr.exe"),
-        },
-      },
     };
   }
   return config;
+};
+
+const readSecrets = () => {
+  try {
+    const secretsFile = readFileSync(secretsPath(), "utf-8");
+    return JSON.parse(secretsFile);
+  } catch (error) {
+    logger.error("Failed to read secrets:", error);
+    return {};
+  }
+};
+const secrets = readSecrets();
+
+export const secret = (key: string): any => {
+  const keys = key.split(".");
+  let result = secrets;
+  for (const k of keys) {
+    if (result && typeof result === "object" && k in result) {
+      result = result[k];
+    } else {
+      return null;
+    }
+  }
+  return result;
 };

@@ -1,6 +1,6 @@
 import { BrowserWindow } from "electron";
-import { ipcMainHandle, ipcMainOn } from "./utils/event/mapper.js";
 import { getLogger } from "./utils/core/logger.js";
+import { registerHandlers } from "./handlers/index.js";
 
 const logger = getLogger();
 
@@ -8,36 +8,14 @@ export const registerEvents = (
   app: Electron.App,
   mainWindow: BrowserWindow
 ) => {
-  ipcMainHandle("getZipFile", (batchId: string, fileName: string) => {
-    try {
-      // return s3ZipExtraction(batchId, fileName);
-    } catch (error) {
-      logger.error(error);
-    }
-    return {} as any;
-  });
-
-  handleFrameEvents(mainWindow);
+  registerHandlers(app, mainWindow);
   handleCloseEvents(app, mainWindow);
 };
 
-export const handleFrameEvents = (mainWindow: BrowserWindow) => {
-  ipcMainOn("sendFrameAction", (payload: FrameWindowAction) => {
-    switch (payload) {
-      case "CLOSE":
-        mainWindow.close();
-        break;
-      case "MAXIMIZE":
-        mainWindow.maximize();
-        break;
-      case "MINIMIZE":
-        mainWindow.minimize();
-        break;
-    }
-  });
-};
-
-function handleCloseEvents(app: Electron.App, mainWindow: BrowserWindow) {
+export const handleCloseEvents = (
+  app: Electron.App,
+  mainWindow: BrowserWindow
+) => {
   let willClose = false;
 
   app.on("window-all-closed", () => {
@@ -63,4 +41,13 @@ function handleCloseEvents(app: Electron.App, mainWindow: BrowserWindow) {
   mainWindow.on("show", () => {
     willClose = false;
   });
-}
+};
+
+// export const validateEventFrame = (frame: WebFrameMain) => {
+//   if (isDev() && new URL(frame.url).host === "localhost:5123") {
+//     return;
+//   }
+//   if (frame.url !== pathToFileURL(uiRoot()).toString()) {
+//     throw new Error("Malicious event");
+//   }
+// };

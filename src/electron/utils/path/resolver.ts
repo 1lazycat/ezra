@@ -28,3 +28,12 @@ export const configPath = () =>
   isDev()
     ? path.join(devRoot(), "electron", "config.json")
     : path.join(app.getAppPath(), "..", "config.json");
+
+export const secretsPath = () =>
+  isDev()
+    ? path.join(devRoot(), "secrets.json")
+    : path.join(app.getAppPath(), "..", "secrets.json");
+
+export const promptPath = (fileName: string) => {
+  return path.join(devRoot(), "data", "prompts", fileName);
+};
