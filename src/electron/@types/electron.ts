@@ -1,5 +1,5 @@
-import { orchestrate } from "../handlers/orchestrator.js";
+import { orchestrate, OrchestratorRequest } from "../handlers/orchestrator.js";
 
 export type ElectronHandlers = {
-  orchestrate: typeof orchestrate;
+  orchestrate: (request: OrchestratorRequest) => Promise<string>;
 };

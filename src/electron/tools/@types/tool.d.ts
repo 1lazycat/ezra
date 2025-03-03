@@ -6,7 +6,12 @@ export type ToolResponse<T> = {
 export type ToolMetadata = {
   name: string;
   description: string;
-  args: { name: string; type: string; description: string }[];
+  args: {
+    name: string;
+    type: string;
+    description: string;
+    required?: boolean;
+  }[];
   returns: string;
 };
 

@@ -16,7 +16,7 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   // Base colors for different states
   const colors = {
     idle: { r: 200, g: 200, b: 255 },
-    listening: { r: 0, g: 150, b: 255 },
+    listening: { r: 255, g: 20, b: 10 },
     speaking: { r: 180, g: 100, b: 255 },
   };
 

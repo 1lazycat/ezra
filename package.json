@@ -23,7 +23,9 @@
     "test:unit": "vitest src"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.23.0",
     "@tailwindcss/vite": "^4.0.9",
+    "@types/dom-speech-recognition": "^0.0.4",
     "axios": "^1.8.1",
     "lucide-react": "^0.477.0",
     "react": "^19.0.0",

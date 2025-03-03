@@ -1,9 +1,17 @@
-import { app, BrowserWindow, Menu } from "electron";
-import { uiRoot, preloadPath, asset } from "./utils/path/resolver.js";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  systemPreferences,
+  Notification,
+  ipcMain,
+} from "electron";
+import { uiRoot, preloadPath } from "./utils/path/resolver.js";
 import { isDev } from "./utils/core/env.js";
 import { createTray } from "./app/tray.js";
 // import { createMenu } from "./app/menu.js";
 import { registerEvents } from "./events.js";
+import from "./tools/index.js";
 
 app.whenReady().then(() => {
   const mainWindow = new BrowserWindow({
@@ -25,4 +33,9 @@ app.whenReady().then(() => {
   registerEvents(app, mainWindow);
   createTray(mainWindow);
   // createMenu(mainWindow);
+  const micStatus = systemPreferences.getMediaAccessStatus("microphone");
+  new Notification({
+    title: "Microphone Access",
+    body: `Microphone access status: ${micStatus}`,
+  }).show();
 });

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Mic, Volume2 } from "lucide-react";
 import AudioVisualizer from "./audio-visualizer";
 import "./assistant.css";
+import { LLMResponse } from "../../../types/llm";
 
 const VoiceAssistant: React.FC = () => {
   const [status, setStatus] = useState<"idle" | "listening" | "speaking">(
@@ -9,7 +10,12 @@ const VoiceAssistant: React.FC = () => {
   );
   const [message, setMessage] = useState<string>("How can I help you today?");
   const [audioData, setAudioData] = useState<Uint8Array | undefined>(undefined);
-  const [userSpeech, setUserSpeech] = useState<string>("");
+  const [llmResponse, setLlmResponse] = useState<LLMResponse | undefined>(
+    undefined
+  );
+  const [displayedMessage, setDisplayedMessage] = useState<string>("");
+  const [isAnimating, setIsAnimating] = useState(false);
+  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -18,6 +24,7 @@ const VoiceAssistant: React.FC = () => {
   const animationFrameRef = useRef<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Initialize audio context
   useEffect(() => {
@@ -39,41 +46,122 @@ const VoiceAssistant: React.FC = () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      if (speechSynthesis && speechSynthesisRef.current) {
+        speechSynthesis.cancel();
+      }
     };
   }, []);
+
+  // Speak message when it changes and status is speaking
+  useEffect(() => {
+    if (
+      status === "speaking" &&
+      message &&
+      message !== "Processing your request..."
+    ) {
+      speakMessage(message);
+    }
+  }, [message, status]);
+
+  // Speak LLM response when it changes
+  useEffect(() => {
+    if (llmResponse && llmResponse.response) {
+      setMessage(llmResponse.response);
+    } else if (llmResponse && llmResponse.error) {
+      setMessage(llmResponse.error);
+    }
+  }, [llmResponse]);
+
+  // Remove the separate animation effect from message changes
+  useEffect(() => {
+    if (message === "Listening..." || message === "Processing your request...") {
+      setDisplayedMessage(message);
+      return;
+    }
+  }, [message]);
+
+  // Speech synthesis function
+  const speakMessage = (text: string) => {
+    if (!speechSynthesis) return;
+
+    // Cancel any ongoing speech and clear animation timeout
+    speechSynthesis.cancel();
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current);
+    }
+
+    // Calculate average speaking rate (words per minute)
+    const wordsPerMinute = 175; // Average speaking rate
+    const wordDelay = (60 * 1000) / wordsPerMinute; // Milliseconds per word
+
+    // Create new utterance
+    speechSynthesisRef.current = new SpeechSynthesisUtterance(text);
+    speechSynthesisRef.current.rate = 1.0; // Normal speech rate
+    speechSynthesisRef.current.onend = () => {
+      if (status === "speaking") {
+        setStatus("idle");
+      }
+    };
+
+    // Reset displayed message and start animation
+    setDisplayedMessage("");
+    const words = text.split(" ");
+    let displayedWords: string[] = [];
+    setIsAnimating(true);
+
+    const animateText = () => {
+      if (displayedWords.length < words.length) {
+        displayedWords.push(words[displayedWords.length]);
+        setDisplayedMessage(displayedWords.join(" "));
+        animationTimeoutRef.current = setTimeout(animateText, wordDelay);
+      } else {
+        setIsAnimating(false);
+      }
+    };
+
+    // Start speaking and animation
+    speechSynthesis.speak(speechSynthesisRef.current);
+    animateText();
+  };
 
   // Start listening
   const startListening = async () => {
     try {
       if (!audioContextRef.current || !analyserRef.current) return;
 
-      // Resume audio context if suspended
       if (audioContextRef.current.state === "suspended") {
         await audioContextRef.current.resume();
       }
 
-      // Request microphone access
       micStreamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          sampleSize: 16,
+        },
       });
 
-      // Connect microphone to analyzer
       sourceNodeRef.current = audioContextRef.current.createMediaStreamSource(
         micStreamRef.current
       );
       sourceNodeRef.current.connect(analyserRef.current);
 
-      // Initialize MediaRecorder
-      mediaRecorderRef.current = new MediaRecorder(micStreamRef.current);
+      mediaRecorderRef.current = new MediaRecorder(micStreamRef.current, {
+        mimeType: "audio/webm;codecs=opus",
+      });
+      audioChunksRef.current = [];
+
       mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
-      mediaRecorderRef.current.start();
+
+      mediaRecorderRef.current.start(100); // Collect data every 100ms
 
       setStatus("listening");
       setMessage("Listening...");
 
-      // Start analyzing audio
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
 
       const updateAudioData = () => {
@@ -85,12 +173,6 @@ const VoiceAssistant: React.FC = () => {
       };
 
       updateAudioData();
-
-      // Simulate AI response after 5 seconds
-      setTimeout(() => {
-        stopListening();
-        sendOrchestrateEvent();
-      }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
       setMessage(
@@ -100,7 +182,7 @@ const VoiceAssistant: React.FC = () => {
     }
   };
 
-  // Stop listening
+  // Stop listening and process audio
   const stopListening = () => {
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -116,13 +198,19 @@ const VoiceAssistant: React.FC = () => {
       cancelAnimationFrame(animationFrameRef.current);
     }
 
-    if (mediaRecorderRef.current) {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current = null;
+      mediaRecorderRef.current.onstop = () => {
+        sendOrchestrateEvent();
+      };
+    } else {
+      sendOrchestrateEvent();
     }
 
     setAudioData(undefined);
-    setStatus("idle");
   };
 
   // Send orchestrate event
@@ -131,24 +219,27 @@ const VoiceAssistant: React.FC = () => {
     setMessage("Processing your request...");
 
     try {
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
-      const audioStream = audioBlob.stream();
-      const response = await window.electron.orchestrate({ query: "User voice input", audioStream });
-      setMessage(response);
-      setUserSpeech("User voice input"); // Display user speech
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/mp3" });
+      const audioBuffer = await audioBlob.arrayBuffer();
+
+      const response = await window.electron.orchestrate({
+        audioData: Array.from(new Uint8Array(audioBuffer)), // Convert to regular array for IPC transmission
+      });
+
+      setLlmResponse(JSON.parse(response));
     } catch (error) {
       console.error("Error sending orchestrate event:", error);
       setMessage("Failed to process your request. Please try again.");
     }
-
-    setStatus("idle");
   };
 
   return (
     <div className="flex flex-col items-center justify-center h-full">
-      <div className="text-center mb-8">
-        <p className="text-xl">{message}</p>
-        <p className="text-lg text-gray-500">{userSpeech}</p> {/* Display user speech */}
+      <div className="w-full max-w-2xl px-6 py-4 mb-12 rounded-lg mt-10">
+        <p className="text-md font-medium text-teal-600 text-center leading-relaxed">
+          {displayedMessage}
+          {isAnimating && <span className="animate-pulse">▋</span>}
+        </p>
       </div>
 
       <div className="relative mb-8">
