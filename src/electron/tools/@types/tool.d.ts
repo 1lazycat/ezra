@@ -1,3 +1,7 @@
+export type ToolArgs = {
+  [key: string]: any;
+};
+
 export type ToolResponse<T> = {
   data: T;
   error?: any;

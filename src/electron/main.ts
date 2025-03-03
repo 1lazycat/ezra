@@ -13,7 +13,7 @@ import { createTray } from "./app/tray.js";
 import { registerEvents } from "./events.js";
 import from "./tools/index.js";
 
-app.whenReady().then(() => {
+async function createWindow() {
   const mainWindow = new BrowserWindow({
     webPreferences: {
       preload: preloadPath(),
@@ -38,4 +38,8 @@ app.whenReady().then(() => {
     title: "Microphone Access",
     body: `Microphone access status: ${micStatus}`,
   }).show();
-});
+
+  registerEvents(app, mainWindow);
+}
+
+app.whenReady().then(createWindow);

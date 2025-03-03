@@ -79,130 +79,65 @@ const VoiceAssistant: React.FC = () => {
     }
   }, [message, status]);
 
-  // Speak LLM response when it changes
-  useEffect(() => {
-    if (llmResponse && llmResponse.response) {
-      setMessage(llmResponse.response);
-    } else if (llmResponse && llmResponse.error) {
-      setMessage(llmResponse.error);
-    }
-  }, [llmResponse]);
-
-  // Remove the separate animation effect from message changes
-  useEffect(() => {
-    if (
-      message === "Listening..." ||
-      message === "Processing your request..."
-    ) {
-      setDisplayedMessage(message);
-      return;
-    }
-  }, [message]);
-
-  // Execute plan steps
-  useEffect(() => {
-    if (
-      llmResponse?.plan?.steps &&
-      currentStep >= 0 &&
-      currentStep < llmResponse.plan.steps.length
-    ) {
-      const step = llmResponse.plan.steps[currentStep];
-      speak(step.description);
-
-      // Execute tool if present
-      if (step.tool) {
-        const toolName = Object.keys(step.tool)[0];
-        const toolArgs = step.tool[toolName].args;
-        // Call the tool through electron
-        window.electron.orchestrate({
-          query: `execute_tool:${toolName}`,
-          args: toolArgs,
-        });
-      }
-    }
-  }, [currentStep, llmResponse]);
-
-  // Update step states when LLM response changes
-  useEffect(() => {
-    if (llmResponse?.plan?.steps) {
-      setStepStates(new Array(llmResponse.plan.steps.length).fill("pending"));
-      // Start execution if there are steps
-      if (llmResponse.plan.steps.length > 0) {
-        setCurrentStep(0);
-        setIsExecutingPlan(true);
-      }
-    }
-  }, [llmResponse]);
-
   // Handle step execution
   useEffect(() => {
-    if (isExecutingPlan && llmResponse?.plan?.steps && currentStep >= 0) {
-      const step = llmResponse.plan.steps[currentStep];
-
-      // Update current step state to active
-      setStepStates((prev) => {
-        const newStates = [...prev];
-        newStates[currentStep] = "active";
-        return newStates;
-      });
-
-      // Read out step description
-      speak(step.description);
-
-      // Execute tool if present
-      if (step.tool) {
-        const toolName = Object.keys(step.tool)[0];
-        const toolArgs = step.tool[toolName].args;
-
-        // Execute tool and handle response
-        window.electron
-          .orchestrate({
-            query: `execute_tool:${toolName}`,
-            args: toolArgs,
-          })
-          .then(() => {
-            // Mark step as completed
-            setStepStates((prev) => {
-              const newStates = [...prev];
-              newStates[currentStep] = "completed";
-              return newStates;
-            });
-
-            // Move to next step after a short delay
-            setTimeout(() => {
-              if (currentStep < llmResponse.plan.steps.length - 1) {
-                setCurrentStep((prev) => prev + 1);
-              } else {
-                setIsExecutingPlan(false);
-                setStatus("idle");
-              }
-            }, 1000);
-          })
-          .catch((error: Error) => {
-            console.error(`Error executing tool ${toolName}:`, error);
-            setMessage(`Failed to execute step: ${step.description}`);
-            setIsExecutingPlan(false);
-            setStatus("idle");
-          });
-      } else {
-        // If no tool, just mark as completed and move to next step
-        setStepStates((prev) => {
-          const newStates = [...prev];
-          newStates[currentStep] = "completed";
-          return newStates;
-        });
-
-        setTimeout(() => {
-          if (currentStep < llmResponse.plan.steps.length - 1) {
-            setCurrentStep((prev) => prev + 1);
-          } else {
-            setIsExecutingPlan(false);
-            setStatus("idle");
-          }
-        }, 2000); // Give more time to read steps without tools
+    if (llmResponse && !isExecutingPlan) {
+      setIsExecutingPlan(true);
+      if (llmResponse.plan.steps) {
+        setStepStates(
+          llmResponse.plan.steps.map((step) =>
+            step.completed ? "completed" : "pending"
+          )
+        );
+        executeSteps(llmResponse);
       }
     }
-  }, [currentStep, isExecutingPlan, llmResponse]);
+  }, [llmResponse]);
+
+  const executeSteps = async (response: LLMResponse) => {
+    for (let i = 0; i < response.plan.steps?.length; i++) {
+      const step = response.plan.steps[i];
+
+      if (step.completed) {
+        continue;
+      }
+
+      const toolName = Object.keys(step.tool)[0];
+      const toolArgs = step.tool[toolName].args;
+
+      try {
+        const result = JSON.parse(
+          await window.electron.execute(toolName, toolArgs)
+        );
+        if (result?.data !== undefined) {
+          speak(`The result is ${result.data}`);
+          llmResponse.plan.steps[i].tool[toolName].result = result.data;
+        }
+        response.plan.steps[i].completed = true;
+
+        if (i === response.plan.steps.length - 1) {
+          const answer = await window.electron.answer({
+            query: response.query,
+            rawAnswer: result.data,
+          });
+          setMessage(answer);
+          setTimeout(() => {
+            speakMessage(answer);
+          }, 1000);
+          setIsExecutingPlan(false);
+          setStatus("idle");
+        }
+      } catch (error) {
+        console.error(`Error executing tool ${toolName}:`, error);
+        speak(`Failed to execute step: ${error.message}`);
+        setMessage(`Failed to execute step: ${step.description}`);
+        setIsExecutingPlan(false);
+        setStatus("idle");
+        return;
+      }
+    }
+    setLlmResponse(JSON.parse(JSON.stringify(response)));
+  };
 
   // Speech synthesis function
   const speakMessage = (text: string) => {
@@ -391,6 +326,13 @@ const VoiceAssistant: React.FC = () => {
                     <div className="mt-2 text-xs text-white/60 flex items-center">
                       <span className="mr-1">Tool:</span>
                       {Object.keys(step.tool)[0]}
+                    </div>
+                  )}
+
+                  {step.tool && step.tool[Object.keys(step.tool)[0]].result && (
+                    <div className="mt-2 text-xs text-white/60 flex items-center">
+                      <span className="mr-1">Result:</span>
+                      {step.tool[Object.keys(step.tool)[0]].result}
                     </div>
                   )}
                 </div>

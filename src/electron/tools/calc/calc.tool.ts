@@ -1,10 +1,11 @@
-import { ToolMetadata, ToolResponse } from "../@types/tool.js";
+import { ToolMetadata, ToolResponse, ToolArgs } from "../@types/tool.js";
 
-export const calcualtor = async (
-  a: number,
-  b: number,
-  operation: string
-): Promise<ToolResponse<number>> => {
+export const calcualtor = async (args: {
+  a: number;
+  b: number;
+  operation: string;
+} satisfies ToolArgs ): Promise<ToolResponse<number>> => {
+  const { a, b, operation } = args;
   const result = await new Promise<number>((resolve, reject) => {
     try {
       switch (operation) {
@@ -39,7 +40,7 @@ export const metadata: ToolMetadata = {
     {
       name: "operation",
       type: "string",
-      description: "Operation to perform",
+      description: "Operation to perform. Allowed values: +, -, *, /",
     },
   ],
   returns: "number",

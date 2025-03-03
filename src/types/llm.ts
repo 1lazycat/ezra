@@ -1,4 +1,5 @@
 export type LLMResponse = {
+  query: string;
   plan: {
     steps: Array<{
       id: string;
@@ -10,8 +11,11 @@ export type LLMResponse = {
           args: {
             [argName: string]: any;
           };
+          result?: any;
+          error?: string;
         };
       };
+      completed?: boolean;
     }>;
   };
   response?: string;

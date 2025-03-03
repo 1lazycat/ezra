@@ -35,6 +35,7 @@ Your response must be valid JSON with this structure (without json mardown block
 
 ```json
 {
+  "query": "User Query",
   "plan": {
     "steps": [
       //steps could be empty array, if response could be generated directly
@@ -64,13 +65,16 @@ Your response must be valid JSON with this structure (without json mardown block
 ### Example 1: Simple request (no tools needed)
 
 **User Input:**
+
 ```
 What does RGB stands for?
 ```
 
 **Response:**
+
 ```json
 {
+  "query": "What does RGB stands for?",
   "plan": {
     "steps": []
   },
@@ -82,13 +86,16 @@ What does RGB stands for?
 ### Example 2: Using tool
 
 **User Input:**
+
 ```
 Create a fitness plan for me.
 ```
 
 **Response:**
+
 ```json
 {
+  "query": "Create a fitness plan for me.",
   "plan": {
     "steps": [
       {
@@ -116,13 +123,16 @@ Create a fitness plan for me.
 ### Example 3: No suitable tool available
 
 **User Input:**
+
 ```
 Can you translate this document into Spanish and format it as a legal contract?
 ```
 
 **Response:**
+
 ```json
 {
+  "query":"Can you translate this document into Spanish and format it as a legal contract?",
   "plan": {
     "steps": []
   },
